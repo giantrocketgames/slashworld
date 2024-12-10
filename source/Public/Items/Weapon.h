@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -8,9 +6,7 @@
 
 class USoundBase;
 class UBoxComponent;
-/**
- * 
- */
+
 UCLASS()
 class SLASH_API AWeapon : public AItem
 {
@@ -29,30 +25,28 @@ protected:
 	void OnWeaponOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 	UFUNCTION(BlueprintImplementableEvent)
 	void CreateFields(const FVector& location);
+
 private:
 	UPROPERTY(EditAnywhere)
 	USoundBase* EquipSound;
-	
-	UPROPERTY(EditAnywhere, Category = "Weapon Properties")
-	UBoxComponent* WeaponBox;
-
 	UPROPERTY(VisibleAnywhere)
 	USceneComponent* BoxTraceStart;
 	UPROPERTY(VisibleAnywhere)
 	USceneComponent* BoxTraceEnd;
 
 	UPROPERTY(EditAnywhere, Category = "Weapon Properties")
+	UBoxComponent* WeaponBox;
+	UPROPERTY(EditAnywhere, Category = "Weapon Properties")
 	float Damage = 20;
-
-	TArray<AActor*> ActorsHitThisAttack;
-
-	void BoxTrace(FHitResult& BoxHit);
 	UPROPERTY(EditAnywhere, Category = "Weapon Properties")
 	FVector BoxTraceExtents = FVector(5.f);
 	UPROPERTY(EditAnywhere, Category = "Weapon Properties")
 	bool bShowBoxDebug = false;
 
 	void ExecuteOnIHitInterface(AActor* HitActor, FHitResult& BoxHit);
+	void BoxTrace(FHitResult& BoxHit);
+
+	TArray<AActor*> ActorsHitThisAttack;
 
 public:
 	FORCEINLINE UBoxComponent* GetWeaponBox() const { return WeaponBox; }

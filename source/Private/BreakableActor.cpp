@@ -1,6 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "BreakableActor.h"
 #include "Items/Treasure.h"
 #include "Kismet/GameplayStatics.h"
@@ -46,7 +43,6 @@ void ABreakableActor::GetHit_Implementation(const FVector& ImpactPoint, AActor* 
 
 	bHit = true;
 
-	UE_LOG(LogTemp, Warning, TEXT("BreakableActor::GetHit_Impl"));
 	if (BreakSound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(

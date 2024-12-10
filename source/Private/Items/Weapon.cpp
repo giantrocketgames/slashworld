@@ -1,6 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Items/Weapon.h"
 #include "Characters/SlashCharacter.h"
 #include "Kismet/GameplayStatics.h"
@@ -35,7 +32,6 @@ void AWeapon::Equip(USceneComponent* InParent, FName SocketName, AActor* NewOwne
 	ItemState = EItemState::EIS_Equipped;
 
 	SetOwner(NewOwner);
-	// Actor can be owned by any Pawn, which is instigator
 	SetInstigator(NewInstigator);
 	AttachMeshToSocket(InParent, SocketName);
 	if (EquipSound)
@@ -90,7 +86,6 @@ void AWeapon::OnWeaponOverlap(UPrimitiveComponent* OverlappedComponent, AActor* 
 		{
 			return;
 		}
-		UE_LOG(LogTemp, Warning, TEXT("Hit actor: %s"), *HitActor->GetName());
 
 		// Hit them (play hit reacts etc) FIRST
 		ExecuteOnIHitInterface(HitActor, BoxHit);
@@ -111,7 +106,6 @@ void AWeapon::ExecuteOnIHitInterface(AActor* HitActor, FHitResult& BoxHit)
 	IHitInterface* HitInterface = Cast<IHitInterface>(HitActor);
 	if (HitInterface)
 	{
-		//HitInterface->GetHit(HitResult.ImpactPoint);
 		HitInterface->Execute_GetHit(HitActor, BoxHit.ImpactPoint, Owner);
 		CreateFields(BoxHit.ImpactPoint);
 	}
@@ -131,17 +125,15 @@ void AWeapon::BoxTrace(FHitResult& BoxHit)
 
 	for (AActor* Actor : ActorsHitThisAttack)
 	{
-		//UE_LOG(LogTemp, Warning, TEXT("Need to ignore actor: %s"), *Actor->GetName());
 		ActorsToIgnore.AddUnique(Actor);
 	}
-	//UE_LOG(LogTemp, Warning, TEXT("Ignoring: %i Actors"), ActorsToIgnore.Num());
+
 	bool bHit = UKismetSystemLibrary::BoxTraceSingle(this, Start, End,
 		BoxTraceExtents,
 		BoxTraceStart->GetComponentRotation(),
 		ETraceTypeQuery::TraceTypeQuery1,
 		false,
 		ActorsToIgnore,
-		//EDrawDebugTrace::Type::ForDuration,
 		bShowBoxDebug ? EDrawDebugTrace::Type::ForDuration : EDrawDebugTrace::Type::None,
 		BoxHit,
 		true);
