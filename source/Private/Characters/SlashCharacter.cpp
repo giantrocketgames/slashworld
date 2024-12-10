@@ -1,6 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Characters/SlashCharacter.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
@@ -47,6 +44,14 @@ void ASlashCharacter::BeginPlay()
 
 	Tags.Add(FName("EngageableTarget"));
 
+	InitializeHUD();
+}
+
+/// <summary>
+/// Initializes the HUD and caches SlashOverlay
+/// </summary>
+void ASlashCharacter::InitializeHUD()
+{
 	AController* ActorController = GetController();
 	if (ActorController)
 	{
@@ -69,6 +74,9 @@ void ASlashCharacter::BeginPlay()
 	}
 }
 
+/// <summary>
+/// Bound to input to move the character if they are able to
+/// </summary>
 void ASlashCharacter::Move(const FInputActionValue& Value)
 {
 	if (!CanMove())
@@ -91,6 +99,9 @@ void ASlashCharacter::Move(const FInputActionValue& Value)
 	}
 }
 
+/// <summary>
+/// Bound to input to rotate the camera & look around
+/// </summary>
 void ASlashCharacter::Look(const FInputActionValue& Value)
 {
 	const FVector2D move = Value.Get<FVector2D>();
@@ -101,6 +112,10 @@ void ASlashCharacter::Look(const FInputActionValue& Value)
 	}
 }
 
+/// <summary>
+/// Bound to input to make the character jump if it's able to
+/// </summary>
+/// <param name="Value"></param>
 void ASlashCharacter::DoJump(const FInputActionValue& Value)
 {
 	if (!CanJump())
@@ -114,6 +129,9 @@ void ASlashCharacter::DoJump(const FInputActionValue& Value)
 	}
 }
 
+/// <summary>
+/// Bound to input to pickup the overlapping item OR arm/disarm our current weapon
+/// </summary>
 void ASlashCharacter::Pickup(const FInputActionValue& Value)
 {
 	if (OverlappingItem)
@@ -143,6 +161,9 @@ void ASlashCharacter::Pickup(const FInputActionValue& Value)
 	}
 }
 
+/// <summary>
+/// Bound to input to trigger an attack if able
+/// </summary>
 void ASlashCharacter::DoAttack(const FInputActionValue& Value)
 {
 	if (!CanAttack())
@@ -150,18 +171,26 @@ void ASlashCharacter::DoAttack(const FInputActionValue& Value)
 		return;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("DoAttack!"));
 	ActionState = EActionState::EAS_Attacking;
 	Attack();
 }
 
+/// <summary>
+/// Bound to input to make the player dodge if able
+/// </summary>
 void ASlashCharacter::DoDodge(const FInputActionValue& Value)
 {
-	if (!CanMove() || !CanDodge()) { return; }
+	if (!CanMove() || !CanDodge())
+	{
+		return;
+	}
 	ActionState = EActionState::EAS_Dodge;
 	PlayDodgeMontage();
 }
-
+/// <summary>
+/// Plays the Equip montage to arm/disarm our current weapon
+/// </summary>
+/// <param name="bEquip">True moves from back->hand. False does hand->back</param>
 void ASlashCharacter::PlayEquipMontage(const bool bEquip)
 {
 	if (EquipMontage)
@@ -171,40 +200,38 @@ void ASlashCharacter::PlayEquipMontage(const bool bEquip)
 	}
 }
 
+/// <summary>
+/// Called via Anim Notify on the animation blueprint when the Attack Montage is finished
+/// </summary>
 void ASlashCharacter::AttackEnd()
 {
 	Super::AttackEnd();
 	ActionState = EActionState::EAS_Unoccupied;
 }
 
+/// <summary>
+/// Called via Anim Notify on the animation blueprint when the Dodge Montage is finished
+/// </summary>
 void ASlashCharacter::DodgeEnd()
 {
 	Super::DodgeEnd();
 	ActionState = EActionState::EAS_Unoccupied;
 }
 
-void ASlashCharacter::Die_Implementation()
+/// <summary>
+/// Called via Anim Notify on the animation blueprint when the Hit React Montage is finished
+/// </summary>
+void ASlashCharacter::HitReactEnd()
 {
-	UE_LOG(LogTemp, Warning, TEXT("PLAYER DEAD"));
-	Super::Die_Implementation();
-	CharacterState = ECharacterState::ECS_Dead;
-	ActionState = EActionState::EAS_Dead;
-}
-
-bool ASlashCharacter::CanDodge()
-{
-	return ActionState == EActionState::EAS_Unoccupied && Super::CanDodge();
-}
-
-void ASlashCharacter::HandleDamage(float Damage)
-{
-	Super::HandleDamage(Damage);
-	if (SlashOverlay && Attributes)
+	if (IsAlive())
 	{
-		SlashOverlay->SetHealthBarPercent(Attributes->GetHealthPercent());
+		ActionState = EActionState::EAS_Unoccupied;
 	}
 }
 
+/// <summary>
+/// Called via Anim Notify on the animation blueprint when the Equip Montage is finished
+/// </summary>
 void ASlashCharacter::EquipEnd(const bool bEquipped)
 {
 	ActionState = EActionState::EAS_Unoccupied;
@@ -220,37 +247,86 @@ void ASlashCharacter::EquipEnd(const bool bEquipped)
 	}
 }
 
-void ASlashCharacter::HitReactEnd()
+/// <summary>
+/// Overridden implementation of Die.
+/// Only custom behavior is setting of states
+/// </summary>
+void ASlashCharacter::Die_Implementation()
 {
-	if (IsAlive())
+	Super::Die_Implementation();
+	CharacterState = ECharacterState::ECS_Dead;
+	ActionState = EActionState::EAS_Dead;
+}
+
+/// <summary>
+/// Called when the character takes damage
+/// Updates SlashOverlay after we take damage
+/// </summary>
+void ASlashCharacter::HandleDamage(float Damage)
+{
+	Super::HandleDamage(Damage);
+	if (SlashOverlay && Attributes)
 	{
-		ActionState = EActionState::EAS_Unoccupied;
+		SlashOverlay->SetHealthBarPercent(Attributes->GetHealthPercent());
 	}
 }
 
+/// <summary>
+/// Implementation for GetHit
+/// Sets ActionState and then does default behavior
+/// </summary>
+void ASlashCharacter::GetHit_Implementation(const FVector& ImpactPoint, AActor* Hitter)
+{
+	ActionState = EActionState::EAS_HitReaction;
+	Super::GetHit_Implementation(ImpactPoint, Hitter);
+}
+
+/// <summary>
+/// Helper to control State
+/// </summary>
 bool ASlashCharacter::CanAttack()
 {
 	return ActionState == EActionState::EAS_Unoccupied && CharacterState != ECharacterState::ECS_Unequipped;
 }
 
+/// <summary>
+/// Helper to control State
+/// </summary>
 bool ASlashCharacter::CanDisarm()
 {
 	return CharacterState != ECharacterState::ECS_Unequipped && ActionState == EActionState::EAS_Unoccupied;
 }
 
+/// <summary>
+/// Helper to control State
+/// </summary>
 bool ASlashCharacter::CanArm()
 {
 	return CharacterState == ECharacterState::ECS_Unequipped && ActionState == EActionState::EAS_Unoccupied;;
 }
 
+/// <summary>
+/// Helper to control State
+/// </summary>
 bool ASlashCharacter::CanMove()
 {
 	return ActionState == EActionState::EAS_Unoccupied;
 }
 
+/// <summary>
+/// Helper to control State
+/// </summary>
 bool ASlashCharacter::CanJump()
 {
 	return CanMove();
+}
+
+/// <summary>
+/// Helper to control State
+/// </summary>
+bool ASlashCharacter::CanDodge()
+{
+	return ActionState == EActionState::EAS_Unoccupied && Super::CanDodge();
 }
 
 void ASlashCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -276,17 +352,18 @@ void ASlashCharacter::Tick(float DeltaTime)
 	}
 }
 
-void ASlashCharacter::GetHit_Implementation(const FVector& ImpactPoint, AActor* Hitter)
-{
-	ActionState = EActionState::EAS_HitReaction;
-	Super::GetHit_Implementation(ImpactPoint, Hitter);
-}
-
+/// <summary>
+/// Set when the character is overlapping with an item in the world
+/// </summary>
 void ASlashCharacter::SetOverlappingItem(AItem* Item)
 {
 	OverlappingItem = Item;
 }
 
+
+/// <summary>
+/// Set when the character is overlapping with treasure in the world
+/// </summary>
 void ASlashCharacter::PickupTreasure(ATreasure* Treasure)
 {
 	if (Attributes)
@@ -300,6 +377,9 @@ void ASlashCharacter::PickupTreasure(ATreasure* Treasure)
 	}
 }
 
+/// <summary>
+/// Set when the character is overlapping with souls in the world
+/// </summary>
 void ASlashCharacter::PickupSoul(ASoul* Soul)
 {
 	if (Attributes)
