@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -17,56 +15,58 @@ class SLASH_API ABaseCharacter : public ACharacter, public IHitInterface
 
 public:
 	ABaseCharacter();
-	virtual void Tick(float DeltaTime) override;
 
 	UFUNCTION(BlueprintCallable)
 	void SetWeaponCollisionEnable(ECollisionEnabled::Type CollisionEnabled);
 
+	/** IHitInterface */
 	virtual void GetHit_Implementation(const FVector& ImpactPoint, AActor* Hitter) override;
+	/** /IHitInterface */
 
 protected:
-	virtual void BeginPlay() override;
-	virtual void Attack();
+	/** AActor */
+	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+	/** /AActor */
+
+	/** Combat Functions **/
+	virtual void HandleDamage(float Damage);
 	virtual bool CanAttack();
 	virtual bool CanDodge();
-	UFUNCTION(BlueprintNativeEvent)
-	void Die();
+	virtual void Attack();
 	virtual bool IsAlive();
-	void PlayDodgeMontage();
 
-
-
+	/** Montages **/
 	virtual void PlayHitReactMontage(const FName& SectionName);
-	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
-	virtual void HandleDamage(float Damage);
-	void PlayMontageSection(UAnimMontage* Montage, const FName& SectionName);
-	void PlayMontage(UAnimMontage* Montage);
-	int32 PlayRandomMontageSection(UAnimMontage* Montage, const TArray<FName>& SectionNames);
 	virtual int32 PlayDeathMontage();
 	virtual int32 PlayAttackMontage();
 	virtual void StopAttackMontage();
-	void DisableCapsule();
-	void DirectionalHitReact(const FVector& ImpactPoint);
+	void PlayDodgeMontage();
+	void PlayMontageSection(UAnimMontage* Montage, const FName& SectionName);
+	void PlayMontage(UAnimMontage* Montage);
+	int32 PlayRandomMontageSection(UAnimMontage* Montage, const TArray<FName>& SectionNames);
 
-	
+	/** Blueprint Native/Callable Functions **/
+	UFUNCTION(BlueprintNativeEvent)
+	void Die();
+	UFUNCTION(BlueprintCallable)
+	virtual void AttackEnd();	// Called by the animation blueprint when the montage notifies the attack is almost over
+	UFUNCTION(BlueprintCallable)
+	virtual void DodgeEnd();	// Called by the animation blueprint when the montage notifies the dodge is almost over
 	UFUNCTION(BlueprintCallable)
 	FVector GetTranslationWarpTarget();
 	UFUNCTION(BlueprintCallable)
 	FVector GetRotationWarpTarget();
-	UPROPERTY(EditAnywhere, category = "Category")
-	double WarpTargetOffset = 75.f;
 
 
-	UFUNCTION(BlueprintCallable)
-	virtual void AttackEnd();
-	UFUNCTION(BlueprintCallable)
-	virtual void DodgeEnd();
-
+	/** Properties **/
 	UPROPERTY(EditDefaultsOnly, category = "Montages")
 	UAnimMontage* AttackMontage;
 
 	UPROPERTY(EditDefaultsOnly, category = "Montages")
 	UAnimMontage* HitReactMontage;
+	
+	UPROPERTY(EditDefaultsOnly, category = "Montages")
+	bool bUseDirectionalHitReact = false;
 
 	UPROPERTY(EditDefaultsOnly, category = "Montages")
 	UAnimMontage* DeathMontage;
@@ -74,24 +74,32 @@ protected:
 	UPROPERTY(EditDefaultsOnly, category = "Montages")
 	UAnimMontage* DodgeMontage;
 
+	UPROPERTY(EditAnywhere, category = "Montages")
+	TArray<FName> AttackMontageSections;
+
+	UPROPERTY(EditAnywhere, category = "Montages")
+	TArray<FName> DeathMontageSections;
+
 	UPROPERTY(EditDefaultsOnly, category = "Audio")
 	USoundBase* HitReactSound;
 
 	UPROPERTY(EditAnywhere, category = "Combat")
-	TArray<FName> AttackMontageSections;
-
-	UPROPERTY(EditAnywhere, category = "Combat")
-	TArray<FName> DeathMontageSections;
-
-	UPROPERTY(EditAnywhere, category = "FX")
 	UParticleSystem* HitParticles;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, category = "Combat")
 	UAttributeComponent* Attributes;
 
-	UPROPERTY(VisibleInstanceOnly)
+	UPROPERTY(VisibleInstanceOnly, category = "Combat")
 	AWeapon* EquippedItem;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, category = "Combat")
 	AActor* CombatTarget;
+
+	UPROPERTY(EditAnywhere, category = "Combat")
+	double WarpTargetOffset = 75.f;
+
+private:
+	void DirectionalHitReact(const FVector& ImpactPoint);
+
+	void DisableCapsule();
 };

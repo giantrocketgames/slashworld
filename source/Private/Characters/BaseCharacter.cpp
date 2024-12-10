@@ -9,19 +9,21 @@ ABaseCharacter::ABaseCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 	Attributes = CreateDefaultSubobject<UAttributeComponent>(TEXT("AttributeComponent"));
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
-
 }
 
-void ABaseCharacter::BeginPlay()
-{
-	Super::BeginPlay();
-}
-
+/// <summary>
+/// Plays the attack montage
+/// Default implementation picks a random section defined by AttackMontageSections
+/// </summary>
+/// <returns>Index of the section played</returns>
 int32 ABaseCharacter::PlayAttackMontage()
 {
 	return PlayRandomMontageSection(AttackMontage, AttackMontageSections);
 }
 
+/// <summary>
+/// Stops the Attack Montage if it's playing
+/// </summary>
 void ABaseCharacter::StopAttackMontage()
 {
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
@@ -31,13 +33,27 @@ void ABaseCharacter::StopAttackMontage()
 	}
 }
 
+/// <summary>
+/// Helper to disable the collision on the Capsule Component
+/// </summary>
 void ABaseCharacter::DisableCapsule()
 {
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
+/// <summary>
+/// Plays a directional hit react based on ImpactPoint 
+/// if bUseDirectionalHitReact is false, it will play the default section
+/// </summary>
+/// <param name="ImpactPoint">Location the hit was from</param>
 void ABaseCharacter::DirectionalHitReact(const FVector& ImpactPoint)
 {
+	if (!bUseDirectionalHitReact)
+	{
+		PlayHitReactMontage(FName("Default"));
+		return;
+	}
+	
 	const FVector Forward = GetActorForwardVector();
 	const FVector ImpactLower = FVector(ImpactPoint.X, ImpactPoint.Y, GetActorLocation().Z);
 	const FVector ToHit = (ImpactLower - GetActorLocation()).GetSafeNormal();
@@ -48,7 +64,6 @@ void ABaseCharacter::DirectionalHitReact(const FVector& ImpactPoint)
 	Theta = FMath::RadiansToDegrees(Theta);
 
 	const FVector CrossProd = FVector::CrossProduct(Forward, ToHit);
-	//Theta *= CrossProd.Z;
 
 	if (CrossProd.Z < 0)
 	{
@@ -70,12 +85,13 @@ void ABaseCharacter::DirectionalHitReact(const FVector& ImpactPoint)
 		Section = FName("FromRight");
 	}
 
-	//PlayHitReactMontage(Section);
-
-	PlayHitReactMontage(FName("Default"));
-
+	PlayHitReactMontage(Section);
 }
 
+/// <summary>
+/// Gets the Motion Warping location target based on CombatTarget's location
+/// This is useful to make sure enemies move into range to hit the player 
+/// </summary>
 FVector ABaseCharacter::GetTranslationWarpTarget()
 {
 	if (CombatTarget == nullptr)
@@ -93,6 +109,10 @@ FVector ABaseCharacter::GetTranslationWarpTarget()
 
 }
 
+/// <summary>
+/// Gets the Motion Warping rotation target based on CombatTarget
+/// This is useful to help enemies always face the player before attacking
+/// </summary>
 FVector ABaseCharacter::GetRotationWarpTarget()
 {
 	if (CombatTarget)
@@ -102,16 +122,27 @@ FVector ABaseCharacter::GetRotationWarpTarget()
 	return FVector();
 }
 
+/// <summary>
+/// Tells the character to attack
+/// Base behavior plays the attack montage
+/// </summary>
 void ABaseCharacter::Attack()
 {
 	PlayAttackMontage();
 }
 
+/// <summary>
+/// Getter to determine if the character can attack or not
+/// Note: Base behavior is always false!
+/// </summary>
 bool ABaseCharacter::CanAttack()
 {
 	return false;
 }
 
+/// <summary>
+/// Getter to determine if the character can dodge or not
+/// </summary>
 bool ABaseCharacter::CanDodge()
 {
 	if (Attributes)
@@ -120,13 +151,15 @@ bool ABaseCharacter::CanDodge()
 	}
 	return false;
 }
-
+/// <summary>
+/// Base implementation for when the character dies
+/// Adds the Dead tag, plays the death montage, and disables collision
+/// </summary>
 void ABaseCharacter::Die_Implementation()
 {
 	Tags.Add(FName("Dead"));
 	if (DeathMontage)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("PLAY DEATH MONTAGE"));
 		PlayMontage(DeathMontage);
 	}
 	DisableCapsule();
@@ -134,33 +167,24 @@ void ABaseCharacter::Die_Implementation()
 	SetWeaponCollisionEnable(ECollisionEnabled::NoCollision);
 }
 
+/// <summary>
+/// Helper for determining if the character is still alive
+/// </summary>
+/// <returns></returns>
 bool ABaseCharacter::IsAlive()
 {
 	return Attributes != nullptr && Attributes->IsAlive();
 }
 
-void ABaseCharacter::PlayDodgeMontage()
-{
-	if (Attributes)
-	{
-		Attributes->UseStamina(Attributes->GetDodgeCost());
-	}
-
-	if (DodgeMontage)
-	{
-		PlayMontage(DodgeMontage);
-	}
-}
-
-void ABaseCharacter::DodgeEnd()
-{
-}
-
-void ABaseCharacter::PlayHitReactMontage(const FName& SectionName)
-{
-	PlayMontage(HitReactMontage);
-}
-
+/// <summary>
+/// Implementation of GetHit
+/// Disables weapon collision
+/// Starts to play a hit reaction
+/// Plays the hit react sound
+/// Plays hit react particles
+/// </summary>
+/// <param name="ImpactPoint">Point the actor was hit at</param>
+/// <param name="Hitter">The hitter who triggered this event</param>
 void ABaseCharacter::GetHit_Implementation(const FVector& ImpactPoint, AActor* Hitter)
 {
 	SetWeaponCollisionEnable(ECollisionEnabled::NoCollision);
@@ -191,12 +215,19 @@ void ABaseCharacter::GetHit_Implementation(const FVector& ImpactPoint, AActor* H
 	}
 }
 
+/// <summary>
+/// The event class for an Actor taking damage
+/// </summary>
 float ABaseCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	HandleDamage(DamageAmount);
 	return DamageAmount;
 }
 
+/// <summary>
+/// Handles taking damage and will potentially trigger Die on the character
+/// </summary>
+/// <param name="Damage">Damage to apply</param>
 void ABaseCharacter::HandleDamage(float Damage)
 {
 	if (Attributes)
@@ -210,6 +241,11 @@ void ABaseCharacter::HandleDamage(float Damage)
 	}
 }
 
+/// <summary>
+/// Plays the specified montage section from the corresponding montage.
+/// </summary>
+/// <param name="Montage">Montage to play</param>
+/// <param name="SectionName">Section to jump to</param>
 void ABaseCharacter::PlayMontageSection(UAnimMontage* Montage, const FName& SectionName)
 {
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
@@ -220,6 +256,10 @@ void ABaseCharacter::PlayMontageSection(UAnimMontage* Montage, const FName& Sect
 	}
 }
 
+/// <summary>
+/// Plays the provided Montage
+/// </summary>
+/// <param name="Montage">Montage to play</param>
 void ABaseCharacter::PlayMontage(UAnimMontage* Montage)
 {
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
@@ -229,6 +269,13 @@ void ABaseCharacter::PlayMontage(UAnimMontage* Montage)
 	}
 }
 
+/// <summary>
+/// Plays a random montage section from the list of provided SectionNames
+/// If the SectionNames is empty it will simply play the Montage
+/// </summary>
+/// <param name="Montage">Montage to play</param>
+/// <param name="SectionNames">Name of sections to pick from</param>
+/// <returns>Index randomly chosen</returns>
 int32 ABaseCharacter::PlayRandomMontageSection(UAnimMontage* Montage, const TArray<FName>& SectionNames)
 {
 	if (SectionNames.Num() <= 0)
@@ -244,27 +291,66 @@ int32 ABaseCharacter::PlayRandomMontageSection(UAnimMontage* Montage, const TArr
 	return Selection;
 }
 
+/// <summary>
+/// Plays the death montage.
+/// Default behavior picks a random section based on DeathMontageSections
+/// </summary>
+/// <returns>Index of the section played</returns>
 int32 ABaseCharacter::PlayDeathMontage()
 {
 	return PlayRandomMontageSection(DeathMontage, DeathMontageSections);
 }
 
+/// <summary>
+/// Plays the dodge montage and deducts the stamina cost from Attributes
+/// </summary>
+void ABaseCharacter::PlayDodgeMontage()
+{
+	if (Attributes)
+	{
+		Attributes->UseStamina(Attributes->GetDodgeCost());
+	}
+
+	if (DodgeMontage)
+	{
+		PlayMontage(DodgeMontage);
+	}
+}
+
+/// <summary>
+/// Plays the specified section from the hit react montage
+/// </summary>
+/// <param name="SectionName">Section name to play</param>
+void ABaseCharacter::PlayHitReactMontage(const FName& SectionName)
+{
+	PlayMontage(HitReactMontage);
+}
+
+/// <summary>
+/// Invoked via blueprint's anim notify event when the dodge montage is finished
+/// </summary>
+void ABaseCharacter::DodgeEnd()
+{
+}
+
+/// <summary>
+/// Invoked when the AnimNotify event is triggered on the blueprint to indicate the attack montage is done
+/// </summary>
 void ABaseCharacter::AttackEnd()
 {
 }
 
-void ABaseCharacter::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-}
-
+/// <summary>
+/// Sets the collision enabled flag on the currently Equipped Weapon
+/// Typically invoked in blueprints via the anim notify event from the attack montage
+/// </summary>
+/// <param name="CollisionEnabled"></param>
 void ABaseCharacter::SetWeaponCollisionEnable(ECollisionEnabled::Type CollisionEnabled)
 {
 	if (!EquippedItem)
 	{
 		return;
 	}
-
 
 	EquippedItem->SetWeaponCollisionEnable(CollisionEnabled);
 }
